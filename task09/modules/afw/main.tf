@@ -13,6 +13,7 @@ resource "azurerm_public_ip" "firewall_pip" {
   resource_group_name = var.resource_group_name
   allocation_method   = "Static"
   sku                 = "Standard"
+  zones               = [1, 2, 3] # For higher availability
 
   lifecycle {
     create_before_destroy = true
@@ -26,12 +27,17 @@ resource "azurerm_firewall" "firewall" {
   resource_group_name = var.resource_group_name
   sku_name            = "AZFW_VNet"
   sku_tier            = "Standard"
+  zones               = [1, 2, 3] # For higher availability
 
   ip_configuration {
     name                 = "configuration"
     subnet_id            = azurerm_subnet.firewall_subnet.id
     public_ip_address_id = azurerm_public_ip.firewall_pip.id
   }
+
+  # Enable DNS proxy mode
+  dns_servers       = null # Use Azure-provided DNS
+  threat_intel_mode = "Alert"
 }
 
 # Create Route Table
@@ -40,12 +46,23 @@ resource "azurerm_route_table" "route_table" {
   location            = var.location
   resource_group_name = var.resource_group_name
 
+  # Internet route through firewall
   route {
     name                   = "ToFirewall"
     address_prefix         = "0.0.0.0/0"
     next_hop_type          = "VirtualAppliance"
     next_hop_in_ip_address = azurerm_firewall.firewall.ip_configuration[0].private_ip_address
   }
+
+  # Add specific routes for AKS services if needed
+  route {
+    name           = "AKSManagementRoute"
+    address_prefix = "AzureCloud.${var.location}"
+    next_hop_type  = "Internet"
+  }
+
+  # Disable BGP route propagation to prevent conflicting routes
+  disable_bgp_route_propagation = true
 }
 
 # Associate Route Table with AKS subnet

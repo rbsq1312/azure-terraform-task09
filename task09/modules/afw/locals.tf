@@ -40,7 +40,7 @@ locals {
     }
   ]
 
-  # Network rules
+  # Network rules - expanded with more comprehensive rules
   network_rules = [
     {
       name                  = "AllowDNS"
@@ -57,26 +57,77 @@ locals {
       protocols             = ["Any"]
     },
     {
-      name                  = "AllowInternetOutbound"
-      source_addresses      = ["*"]
+      name                  = "AllowAKSEgress"
+      source_addresses      = ["10.0.0.0/16"] # Using the VNet address space to cover all subnets
       destination_addresses = ["*"]
       destination_ports     = ["*"]
+      protocols             = ["Any"]
+    },
+    {
+      name                  = "AllowAKSCommunication"
+      source_addresses      = ["*"]
+      destination_addresses = ["*"]
+      destination_ports     = ["22", "443", "9000", "1194"]
+      protocols             = ["TCP", "UDP"]
+    },
+    {
+      name                  = "AllowHTTPOutbound"
+      source_addresses      = ["*"]
+      destination_addresses = ["*"]
+      destination_ports     = ["80", "443"]
       protocols             = ["TCP"]
+    },
+    {
+      name                  = "AllowNTP"
+      source_addresses      = ["*"]
+      destination_addresses = ["*"]
+      destination_ports     = ["123"]
+      protocols             = ["UDP"]
     }
   ]
 
-  # App rule FQDNs
+  # App rule FQDNs - expanded with more comprehensive AKS-related domains
   app_rule_fqdns = [
+    # Azure AKS required FQDNs
+    "*.hcp.${var.location}.azmk8s.io",
+    "*.tun.${var.location}.azmk8s.io",
+    "aks-engine-fqdn.${var.location}.cloudapp.azure.com",
+
+    # Azure services
     "*.aks-ingress.microsoft.com",
     "*.aks.microsoft.com",
     "*.login.microsoft.com",
     "*.monitoring.azure.com",
     "*.azurecr.io",
+    "*.data.mcr.microsoft.com",
     "*.blob.core.windows.net",
     "mcr.microsoft.com",
     "*.cdn.mscr.io",
     "management.azure.com",
     "login.microsoftonline.com",
-    "*.kubernetes.io"
+
+    # Kubernetes services
+    "*.kubernetes.io",
+    "kubernetes.io",
+    "k8s.gcr.io",
+    "storage.googleapis.com",
+    "security.ubuntu.com",
+    "packages.microsoft.com",
+    "azure.archive.ubuntu.com",
+    "motd.ubuntu.com",
+
+    # Monitoring and metrics
+    "dc.services.visualstudio.com",
+    "*.opinsights.azure.com",
+    "*.monitoring.azure.com",
+    "prometheus.monitor.azure.com",
+
+    # Other essential services
+    "checkip.dyndns.org",
+    "api.snapcraft.io",
+    "graph.microsoft.com",
+    "*.api.azurecr.io",
+    "*.teleport.azure.com",
+    "*.ubuntu.com"
   ]
 }
