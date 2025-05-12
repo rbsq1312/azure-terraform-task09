@@ -20,14 +20,14 @@ data "azurerm_subnet" "aks_subnet" {
 
 # Deploy the firewall module
 module "afw" {
-  source              = "./modules/afw"
-  unique_id           = var.unique_id
-  location            = var.location
-  resource_group_name = var.rg_name
-  vnet_name           = var.vnet_name
-  vnet_id             = data.azurerm_virtual_network.vnet.id
+  source                 = "./modules/afw"
+  unique_id              = var.unique_id
+  location               = var.location
+  resource_group_name    = var.rg_name
+  vnet_name              = var.vnet_name
+  vnet_id                = data.azurerm_virtual_network.vnet.id
   firewall_subnet_prefix = local.fw_subnet_name
   firewall_subnet_cidr   = local.fw_subnet_prefix
-  aks_subnet_id       = data.azurerm_subnet.aks_subnet.id
-  aks_loadbalancer_ip = var.aks_loadbalancer_ip
+  aks_subnet_id          = data.azurerm_subnet.aks_subnet.id
+  aks_loadbalancer_ip    = var.aks_loadbalancer_ip
 }

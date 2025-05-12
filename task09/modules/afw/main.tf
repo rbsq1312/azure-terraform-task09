@@ -13,7 +13,7 @@ resource "azurerm_public_ip" "firewall_pip" {
   resource_group_name = var.resource_group_name
   allocation_method   = "Static"
   sku                 = "Standard"
-  
+
   lifecycle {
     create_before_destroy = true
   }
@@ -39,7 +39,7 @@ resource "azurerm_route_table" "route_table" {
   name                = local.route_table_name
   location            = var.location
   resource_group_name = var.resource_group_name
-  
+
   route {
     name                   = "ToFirewall"
     address_prefix         = "0.0.0.0/0"
@@ -56,88 +56,64 @@ resource "azurerm_subnet_route_table_association" "aks_route_association" {
 
 # Create NAT Rule Collection for inbound traffic to NGINX
 resource "azurerm_firewall_nat_rule_collection" "nat_rules" {
-  name                = "nat-rule-collection"
+  name                = local.rule_collections.nat.name
   azure_firewall_name = azurerm_firewall.firewall.name
   resource_group_name = var.resource_group_name
-  priority            = local.nat_rule_priority
-  action              = "Dnat"
+  priority            = local.rule_collections.nat.priority
+  action              = local.rule_collections.nat.action
 
-  rule {
-    name                  = "AllowInboundHTTP"
-    source_addresses      = ["*"]
-    destination_addresses = [azurerm_public_ip.firewall_pip.ip_address]
-    destination_ports     = ["80"]
-    protocols             = ["TCP"]
-    translated_address    = var.aks_loadbalancer_ip
-    translated_port       = "80"
-  }
-  
-  rule {
-    name                  = "AllowInboundHTTPS"
-    source_addresses      = ["*"]
-    destination_addresses = [azurerm_public_ip.firewall_pip.ip_address]
-    destination_ports     = ["443"]
-    protocols             = ["TCP"]
-    translated_address    = var.aks_loadbalancer_ip
-    translated_port       = "443"
+  dynamic "rule" {
+    for_each = local.nat_rules
+    content {
+      name                  = rule.value.name
+      source_addresses      = rule.value.source_addresses
+      destination_addresses = [azurerm_public_ip.firewall_pip.ip_address]
+      destination_ports     = rule.value.destination_ports
+      protocols             = rule.value.protocols
+      translated_address    = var.aks_loadbalancer_ip
+      translated_port       = rule.value.translated_port
+    }
   }
 }
 
 # Create Network Rule Collection for outbound traffic
 resource "azurerm_firewall_network_rule_collection" "network_rules" {
-  name                = "network-rule-collection"
+  name                = local.rule_collections.network.name
   azure_firewall_name = azurerm_firewall.firewall.name
   resource_group_name = var.resource_group_name
-  priority            = local.network_rule_priority
-  action              = "Allow"
+  priority            = local.rule_collections.network.priority
+  action              = local.rule_collections.network.action
 
-  rule {
-    name                  = "AllowDNS"
-    source_addresses      = ["*"]
-    destination_addresses = ["*"]
-    destination_ports     = ["53"]
-    protocols             = ["UDP", "TCP"]
-  }
-  
-  rule {
-    name                  = "AllowAzureCloud"
-    source_addresses      = ["*"]
-    destination_addresses = ["AzureCloud"]
-    destination_ports     = ["*"]
-    protocols             = ["Any"]
+  dynamic "rule" {
+    for_each = local.network_rules
+    content {
+      name                  = rule.value.name
+      source_addresses      = rule.value.source_addresses
+      destination_addresses = rule.value.destination_addresses
+      destination_ports     = rule.value.destination_ports
+      protocols             = rule.value.protocols
+    }
   }
 }
 
 # Create Application Rule Collection
 resource "azurerm_firewall_application_rule_collection" "app_rules" {
-  name                = "app-rule-collection"
+  name                = local.rule_collections.application.name
   azure_firewall_name = azurerm_firewall.firewall.name
   resource_group_name = var.resource_group_name
-  priority            = local.app_rule_priority
-  action              = "Allow"
+  priority            = local.rule_collections.application.priority
+  action              = local.rule_collections.application.action
 
   rule {
     name             = "AllowAKSOutbound"
     source_addresses = ["*"]
-    
-    target_fqdns = [
-      "*.aks-ingress.microsoft.com",
-      "*.aks.microsoft.com",
-      "*.login.microsoft.com",
-      "*.monitoring.azure.com",
-      "*.azurecr.io",
-      "*.blob.core.windows.net",
-      "mcr.microsoft.com",
-      "*.cdn.mscr.io",
-      "management.azure.com",
-      "login.microsoftonline.com"
-    ]
-    
+    target_fqdns     = local.app_rule_fqdns
+
     protocol {
       port = "443"
       type = "Https"
     }
-    
+
     protocol {
       port = "80"
       type = "Http"
